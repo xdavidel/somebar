@@ -1,0 +1,191 @@
+From 90995c34b6e268ff11bae0b27ab11d18ce99f9f2 Mon Sep 17 00:00:00 2001
+From: krypek <115574014+krypciak@users.noreply.github.com>
+Date: Sun, 20 Nov 2022 13:54:07 +0100
+Subject: [PATCH] Add more theming options
+
+---
+ src/bar.cpp    | 52 ++++++++++++++++++++++++++++++++++++--------------
+ src/bar.hpp    |  6 +++---
+ src/common.hpp |  7 ++++++-
+ src/config.hpp | 22 +++++++++++++++++++--
+ 4 files changed, 67 insertions(+), 20 deletions(-)
+
+diff --git a/src/bar.cpp b/src/bar.cpp
+index 6d1847e..0356a7c 100644
+--- a/src/bar.cpp
++++ b/src/bar.cpp
+@@ -228,8 +228,8 @@ void Bar::render()
+ 
+ 	renderTags();
+ 	setColorScheme(_selected ? colorActive : colorInactive);
+-	renderComponent(_layoutCmp);
+-	renderComponent(_titleCmp);
++	renderComponent(_layoutCmp, Layout);
++	renderComponent(_titleCmp, Titlebar);
+ 	renderStatus();
+ 
+ 	_painter = nullptr;
+@@ -247,7 +247,7 @@ void Bar::renderTags()
+ 		setColorScheme(
+ 			tag.state & TagState::Active ? colorActive : colorInactive,
+ 			tag.state & TagState::Urgent);
+-		renderComponent(tag.component);
++		renderComponent(tag.component, Tags);
+ 		auto indicators = std::min(tag.numClients, static_cast<int>(_bufs->height/2));
+ 		for (auto ind = 0; ind < indicators; ind++) {
+ 			auto w = ind == tag.focusedClient ? 7 : 1;
+@@ -263,47 +263,71 @@ void Bar::renderTags()
+ void Bar::renderStatus()
+ {
+ 	pango_cairo_update_layout(_painter, _statusCmp.pangoLayout.get());
+-	beginBg();
++	beginBg(Status);
+ 	auto start = _bufs->width - _statusCmp.width() - paddingX*2;
+ 	cairo_rectangle(_painter, _x, 0, _bufs->width-_x+start, _bufs->height);
+ 	cairo_fill(_painter);
+ 
+ 	_x = start;
+-	renderComponent(_statusCmp);
++	renderComponent(_statusCmp, Status);
+ }
+ 
+ void Bar::setColorScheme(const ColorScheme& scheme, bool invert)
+ {
+ 	_colorScheme = invert
+-		? ColorScheme {scheme.bg, scheme.fg}
+-		: ColorScheme {scheme.fg, scheme.bg};
++		? ColorScheme {
++            scheme.tag_bg,       scheme.tag_fg,
++            scheme.titlebar_bg,  scheme.titlebar_fg,
++            scheme.layout_bg,    scheme.layout_fg,
++            scheme.status_bg,    scheme.status_fg,
++        }
++		: ColorScheme {
++            scheme.tag_fg,       scheme.tag_bg, 
++            scheme.titlebar_fg,  scheme.titlebar_bg,
++            scheme.layout_fg,    scheme.layout_bg,
++            scheme.status_fg,    scheme.status_bg,
++        };
+ }
+ static void setColor(cairo_t* painter, const Color& color)
+ {
+ 	cairo_set_source_rgba(painter,
+ 		color.r/255.0, color.g/255.0, color.b/255.0, color.a/255.0);
+ }
+-void Bar::beginFg()
++void Bar::beginFg(ComponentType type)
+ {
+-	setColor(_painter, _colorScheme.fg);
++    Color color;
++    switch(type) {
++        case Tags:     color = _colorScheme.tag_fg;      break;
++        case Titlebar: color = _colorScheme.titlebar_fg; break;
++        case Layout:   color = _colorScheme.layout_fg;   break;
++        case Status:   color = _colorScheme.status_fg;   break;
++    };
++	setColor(_painter, color);
+ }
+-void Bar::beginBg()
++void Bar::beginBg(ComponentType type)
+ {
+-	setColor(_painter, _colorScheme.bg);
++    Color color;
++    switch(type) {
++        case Tags:     color = _colorScheme.tag_bg;      break;
++        case Titlebar: color = _colorScheme.titlebar_bg; break;
++        case Layout:   color = _colorScheme.layout_bg;   break;
++        case Status:   color = _colorScheme.status_bg;   break;
++    };
++	setColor(_painter, color);
+ }
+ 
+-void Bar::renderComponent(BarComponent& component)
++void Bar::renderComponent(BarComponent& component, ComponentType type)
+ {
+ 	pango_cairo_update_layout(_painter, component.pangoLayout.get());
+ 	auto size = component.width() + paddingX*2;
+ 	component.x = _x;
+ 
+-	beginBg();
++	beginBg(type);
+ 	cairo_rectangle(_painter, _x, 0, size, _bufs->height);
+ 	cairo_fill(_painter);
+ 	cairo_move_to(_painter, _x+paddingX, paddingY);
+ 
+-	beginFg();
++	beginFg(type);
+ 	pango_cairo_show_layout(_painter, component.pangoLayout.get());
+ 	_x += size;
+ }
+diff --git a/src/bar.hpp b/src/bar.hpp
+index cf0fcac..e911da8 100644
+--- a/src/bar.hpp
++++ b/src/bar.hpp
+@@ -55,9 +55,9 @@ class Bar {
+ 
+ 	// low-level rendering
+ 	void setColorScheme(const ColorScheme& scheme, bool invert = false);
+-	void beginFg();
+-	void beginBg();
+-	void renderComponent(BarComponent& component);
++	void beginFg(ComponentType type);
++	void beginBg(ComponentType type);
++	void renderComponent(BarComponent& component, ComponentType type);
+ 	BarComponent createComponent(const std::string& initial = {});
+ public:
+ 	Bar();
+diff --git a/src/common.hpp b/src/common.hpp
+index aed4480..ef9da27 100644
+--- a/src/common.hpp
++++ b/src/common.hpp
+@@ -17,8 +17,13 @@ struct Color {
+ 	uint8_t r, g, b, a {255};
+ };
+ struct ColorScheme {
+-	Color fg, bg;
++	Color tag_fg, tag_bg, 
++          titlebar_fg, titlebar_bg,
++          layout_fg, layout_bg,
++          status_fg, status_bg;
+ };
++enum ComponentType { Tags, Titlebar, Layout, Status };
++
+ union Arg {
+ 	unsigned int ui;
+ 	const void* v;
+diff --git a/src/config.hpp b/src/config.hpp
+index 9ec1224..5c365dc 100644
+--- a/src/config.hpp
++++ b/src/config.hpp
+@@ -12,8 +12,26 @@ constexpr int paddingY = 3;
+ // See https://docs.gtk.org/Pango/type_func.FontDescription.from_string.html
+ constexpr const char* font = "Sans 12";
+ 
+-constexpr ColorScheme colorInactive = {Color(0xbb, 0xbb, 0xbb), Color(0x22, 0x22, 0x22)};
+-constexpr ColorScheme colorActive = {Color(0xee, 0xee, 0xee), Color(0x00, 0x55, 0x77)};
++constexpr ColorScheme colorInactive = {
++    /* tag_fg:      */ Color(0xbb, 0xbb, 0xbb),
++    /* tag_bg:      */ Color(0x22, 0x22, 0x22),
++    /* titlebar_fg: */ Color(0xbb, 0xbb, 0xbb),
++    /* titlebar_bg: */ Color(0x22, 0x22, 0x22),
++    /* layout_fg:   */ Color(0xbb, 0xbb, 0xbb),
++    /* layout_bg:   */ Color(0x22, 0x22, 0x22),
++    /* status_fg:   */ Color(0x22, 0x22, 0x22),
++    /* status_bg:   */ Color(0x22, 0x22, 0x22),
++};
++constexpr ColorScheme colorActive = {
++    /* tag_fg:      */ Color(0xee, 0xee, 0xee),
++    /* tag_bg:      */ Color(0x00, 0x55, 0x77),
++    /* titlebar_fg: */ Color(0xdd, 0xdd, 0xdd),
++    /* titlebar_bg: */ Color(0x22, 0x22, 0x22),
++    /* layout_fg:   */ Color(0xbb, 0xbb, 0xbb),
++    /* layout_bg:   */ Color(0x22, 0x22, 0x22),
++    /* status_fg:   */ Color(0x22, 0x22, 0x22),
++    /* status_bg:   */ Color(0x22, 0x22, 0x22),
++};
+ constexpr const char* termcmd[] = {"alacritty", nullptr};
+ 
+ static std::vector<std::string> tagNames = {
+-- 
+2.38.1
+

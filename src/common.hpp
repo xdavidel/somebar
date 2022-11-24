@@ -17,8 +17,13 @@ struct Color {
 	uint8_t r, g, b, a {255};
 };
 struct ColorScheme {
-	Color fg, bg;
+	Color tag_fg, tag_bg, 
+          titlebar_fg, titlebar_bg,
+          layout_fg, layout_bg,
+          status_fg, status_bg;
 };
+enum ComponentType { Tags, Titlebar, Layout, Status };
+
 union Arg {
 	unsigned int ui;
 	const void* v;

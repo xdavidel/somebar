@@ -226,8 +226,8 @@ void Bar::render()
 
 	renderTags();
 	setColorScheme(_selected ? colorActive : colorInactive);
-	renderComponent(_layoutCmp);
-	renderComponent(_titleCmp);
+	renderComponent(_layoutCmp, Layout);
+	renderComponent(_titleCmp, Titlebar);
 	renderStatus();
 
 	_painter = nullptr;
@@ -254,7 +254,7 @@ void Bar::renderTags()
 			setColorScheme(
 				tag.state & TagState::Active ? colorActive : colorInactive,
 				tag.state & TagState::Urgent);
-			renderComponent(tag.component);
+    		renderComponent(tag.component, Tags);
 		}
 		for (auto ind = 0; ind < indicators; ind++) {
 			auto w = ind == tag.focusedClient ? 7 : 1;
@@ -270,47 +270,71 @@ void Bar::renderTags()
 void Bar::renderStatus()
 {
 	pango_cairo_update_layout(_painter, _statusCmp.pangoLayout.get());
-	beginBg();
+	beginBg(Status);
 	auto start = _bufs->width - _statusCmp.width() - paddingX*2;
 	cairo_rectangle(_painter, _x, 0, _bufs->width-_x+start, _bufs->height);
 	cairo_fill(_painter);
 
 	_x = start;
-	renderComponent(_statusCmp);
+	renderComponent(_statusCmp, Status);
 }
 
 void Bar::setColorScheme(const ColorScheme& scheme, bool invert)
 {
 	_colorScheme = invert
-		? ColorScheme {scheme.bg, scheme.fg}
-		: ColorScheme {scheme.fg, scheme.bg};
+		? ColorScheme {
+            scheme.tag_bg,       scheme.tag_fg,
+            scheme.titlebar_bg,  scheme.titlebar_fg,
+            scheme.layout_bg,    scheme.layout_fg,
+            scheme.status_bg,    scheme.status_fg,
+        }
+		: ColorScheme {
+            scheme.tag_fg,       scheme.tag_bg,
+            scheme.titlebar_fg,  scheme.titlebar_bg,
+            scheme.layout_fg,    scheme.layout_bg,
+            scheme.status_fg,    scheme.status_bg,
+        };
 }
 static void setColor(cairo_t* painter, const Color& color)
 {
 	cairo_set_source_rgba(painter,
 		color.r/255.0, color.g/255.0, color.b/255.0, color.a/255.0);
 }
-void Bar::beginFg()
+void Bar::beginFg(ComponentType type)
 {
-	setColor(_painter, _colorScheme.fg);
+    Color color;
+    switch(type) {
+        case Tags:     color = _colorScheme.tag_fg;      break;
+        case Titlebar: color = _colorScheme.titlebar_fg; break;
+        case Layout:   color = _colorScheme.layout_fg;   break;
+        case Status:   color = _colorScheme.status_fg;   break;
+    };
+	setColor(_painter, color);
 }
-void Bar::beginBg()
+void Bar::beginBg(ComponentType type)
 {
-	setColor(_painter, _colorScheme.bg);
+    Color color;
+    switch(type) {
+        case Tags:     color = _colorScheme.tag_bg;      break;
+        case Titlebar: color = _colorScheme.titlebar_bg; break;
+        case Layout:   color = _colorScheme.layout_bg;   break;
+        case Status:   color = _colorScheme.status_bg;   break;
+    };
+	setColor(_painter, color);
 }
 
-void Bar::renderComponent(BarComponent& component)
+void Bar::renderComponent(BarComponent& component, ComponentType type)
 {
 	pango_cairo_update_layout(_painter, component.pangoLayout.get());
 	auto size = component.width() + paddingX*2;
 	component.x = _x;
 
-	beginBg();
+	beginBg(type);
 	cairo_rectangle(_painter, _x, 0, size, _bufs->height);
 	cairo_fill(_painter);
 	cairo_move_to(_painter, _x+paddingX, paddingY);
 
-	beginFg();
+	beginFg(type);
 	pango_cairo_show_layout(_painter, component.pangoLayout.get());
 	_x += size;
 }

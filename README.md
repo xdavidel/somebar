@@ -93,6 +93,8 @@ Like all suckless software, somebar can be customized via patches. You can find 
 
 - hide-vacant-tags:
   Only show tags with clients.
+- add-more-theming-options:
+  Enable changing the theme for more parts of the status bar.
 
 ## License
 
