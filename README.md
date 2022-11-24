@@ -1,5 +1,7 @@
 # somebar - dwm-like bar for dwl
 
+This is my fork of [somebar](https://git.sr.ht/~raphi/somebar).
+
 ![Screenshot](screenshot.png)
 
 The mailing list for this project is
@@ -86,6 +88,11 @@ since dwl must implement the wayland extension too.
 ## Other patches
 
 Like all suckless software, somebar can be customized via patches. You can find some patches in the contrib folder with descriptions written in them.
+
+### Applied Patches
+
+- hide-vacant-tags:
+  Only show tags with clients.
 
 ## License
 

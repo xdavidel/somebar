@@ -240,12 +240,22 @@ void Bar::render()
 
 void Bar::renderTags()
 {
+	bool focused;
 	for (auto &tag : _tags) {
-		setColorScheme(
-			tag.state & TagState::Active ? colorActive : colorInactive,
-			tag.state & TagState::Urgent);
-		renderComponent(tag.component);
+		focused = false;
 		auto indicators = std::min(tag.numClients, static_cast<int>(_bufs->height/2));
+		for (auto ind = 0; ind < indicators; ind++) {
+			if (tag.focusedClient){
+				focused = true;
+			}
+		}
+
+		if (tag.state & TagState::Active || focused){
+			setColorScheme(
+				tag.state & TagState::Active ? colorActive : colorInactive,
+				tag.state & TagState::Urgent);
+			renderComponent(tag.component);
+		}
 		for (auto ind = 0; ind < indicators; ind++) {
 			auto w = ind == tag.focusedClient ? 7 : 1;
 			cairo_move_to(_painter, tag.component.x, ind*2+0.5);
